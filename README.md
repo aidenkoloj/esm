@@ -793,3 +793,4 @@ This source code is licensed under the MIT license found in the `LICENSE` file
 in the root directory of this source tree.
 
 ESM Metagenomic Atlas (also referred to as “ESM Metagenomic Structure Atlas” or “ESM Atlas”) data is available under a CC BY 4.0 license for academic and commercial use. Copyright (c) Meta Platforms, Inc. All Rights Reserved. Use of the ESM Metagenomic Atlas data is subject to the Meta Open Source [Terms of Use](https://opensource.fb.com/legal/terms/) and [Privacy Policy](https://opensource.fb.com/legal/privacy/).
+# Using this repo for circular permutation fine-tuning experiments
