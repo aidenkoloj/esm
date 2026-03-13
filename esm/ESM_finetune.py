@@ -7,16 +7,114 @@ import torch.nn.functional as F
 import random
 import wandb
 import argparse
+import os
+import time
 
-
-def setup_model(model_name="facebook/esm2_t6_8M_UR50D"):
+def setup_model(model_name="facebook/esm2_t30_150M_UR50D", checkpoint_path=None):
     """
     Initialize model for fine-tuning
     """
     
     model = EsmForMaskedLM.from_pretrained(model_name)
+
+    if checkpoint_path is not None:
+        print(f"Loading checkpoint from: {checkpoint_path}")
+        load_checkpoint(model, checkpoint_path)
     
     return model
+
+
+def load_checkpoint(model, checkpoint_path):
+    """
+    Load model weights from checkpoint
+    
+    Parameters
+    ----------
+    model : torch.nn.Module
+        Model to load weights into
+    checkpoint_path : str
+        Path to checkpoint file
+    """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    # Load checkpoint
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    
+    # Handle different checkpoint formats
+    if 'model_state_dict' in checkpoint:
+        state_dict = checkpoint['model_state_dict']
+        print("Loading from 'model_state_dict' key")
+        
+        # Print additional checkpoint info if available
+        if 'epoch' in checkpoint:
+            print(f"Checkpoint from epoch: {checkpoint['epoch']}")
+        if 'train_loss' in checkpoint:
+            print(f"Training loss: {checkpoint['train_loss']:.4f}")
+        if 'val_loss' in checkpoint:
+            print(f"Validation loss: {checkpoint['val_loss']:.4f}")
+            
+    elif 'state_dict' in checkpoint:
+        state_dict = checkpoint['state_dict']
+        print("Loading from 'state_dict' key")
+    else:
+        state_dict = checkpoint
+        print("Loading checkpoint as raw state dict")
+    
+    # Load the state dict
+    print("Loading fine-tuned weights...")
+    try:
+        model.load_state_dict(state_dict, strict=False)
+        print("✓ Checkpoint loaded successfully!")
+    except Exception as e:
+        print(f"Warning: Error loading checkpoint: {e}")
+        print("Continuing with base model weights...")
+
+def resume_training_from_checkpoint(checkpoint_path, optimizer=None):
+    """
+    Load training state from checkpoint for resuming training
+    Enhanced to handle batch counting
+    """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    
+    training_state = {}
+    
+    if 'epoch' in checkpoint:
+        training_state['start_epoch'] = checkpoint['epoch']
+        print(f"Resuming from epoch: {checkpoint['epoch']}")
+    else:
+        training_state['start_epoch'] = 0
+        
+    # Handle batch counting for proper resuming
+    if 'total_batches_processed' in checkpoint:
+        training_state['total_batches_processed'] = checkpoint['total_batches_processed']
+        print(f"Resuming from batch: {checkpoint['total_batches_processed']:,}")
+    else:
+        training_state['total_batches_processed'] = 0
+        
+    if 'optimizer_step_count' in checkpoint:
+        training_state['optimizer_step_count'] = checkpoint['optimizer_step_count']
+        print(f"Optimizer step count: {checkpoint['optimizer_step_count']:,}")
+    else:
+        training_state['optimizer_step_count'] = 0
+        
+    if 'optimizer_state_dict' in checkpoint and optimizer is not None:
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        print("✓ Optimizer state loaded")
+        
+    if 'train_loss' in checkpoint:
+        training_state['last_train_loss'] = checkpoint['train_loss']
+        
+    if 'best_val_loss' in checkpoint:
+        training_state['best_val_loss'] = checkpoint['best_val_loss']
+    elif 'val_loss' in checkpoint:
+        training_state['best_val_loss'] = checkpoint['val_loss']
+    else:
+        training_state['best_val_loss'] = float('inf')
+        
+    return training_state
+
+
 
 
 class UniRef50Dataset(Dataset):
@@ -49,7 +147,7 @@ class UniRef50Dataset(Dataset):
     cp : bool
         circular permutation applied
     """
-    def __init__(self, fasta_path, tokenizer_name, max_length = 1024, cp = True):
+    def __init__(self, fasta_path, tokenizer_name, max_length, cp = True):
         self.sequences = self.read_fasta(fasta_path)
         self.tokenizer = EsmTokenizer.from_pretrained(tokenizer_name)
         self.max_length = max_length
@@ -81,24 +179,24 @@ class UniRef50Dataset(Dataset):
         return len(self.sequences)
 
     def __getitem__(self, idx):
-    """
-    Retrieve and tokenize a protein sequence.
-
-    Parameters
-    ----------
-    idx : int
-        Index of the sequence to retrieve.
-
-    Returns
-    -------
-    dict
-        A dictionary containing:
-        
-        - **input_ids** (torch.Tensor): Tokenized sequence IDs of shape `(L,)`,
-          where `L <= max_length`.
-        - **attention_mask** (torch.Tensor): Attention mask of shape `(L,)`
-          indicating which tokens are padding (0) vs. real sequence (1).
-    """
+        """
+        Retrieve and tokenize a protein sequence.
+    
+        Parameters
+        ----------
+        idx : int
+            Index of the sequence to retrieve.
+    
+        Returns
+        -------
+        dict
+            A dictionary containing:
+            
+            - **input_ids** (torch.Tensor): Tokenized sequence IDs of shape `(L,)`,
+              where `L <= max_length`.
+            - **attention_mask** (torch.Tensor): Attention mask of shape `(L,)`
+              indicating which tokens are padding (0) vs. real sequence (1).
+        """
         seq = self.sequences[idx]
 
         # Create circular permutation of the sequence if cp == True
@@ -156,6 +254,8 @@ def generate_dataset_splits(dataset, splits=[0.70, 0.15, 0.15], seed=None):
     - If `seed` is set, the split will always be the same for the same dataset.
     """
     dataset_size = len(dataset)
+    print(f'Number of sequences in dataset: {dataset_size:,}')
+    
     train_size = int(dataset_size * splits[0])
     val_size = int(dataset_size * splits[1])
     test_size = dataset_size - train_size - val_size
@@ -172,7 +272,7 @@ def generate_dataset_splits(dataset, splits=[0.70, 0.15, 0.15], seed=None):
 
 from torch.utils.data import DataLoader
 
-def generate_dataloader(train_dataset, val_dataset, test_dataset, batch_size):
+def generate_dataloader(train_dataset, val_dataset, test_dataset, args):
     """
     Create DataLoaders for training, validation, and test splits.
 
@@ -206,7 +306,7 @@ def generate_dataloader(train_dataset, val_dataset, test_dataset, batch_size):
     """
     train_loader = DataLoader(
         train_dataset,
-        batch_size=batch_size,
+        batch_size=args.batch_size,
         shuffle=True,
         pin_memory=True,
         prefetch_factor=2,
@@ -214,13 +314,13 @@ def generate_dataloader(train_dataset, val_dataset, test_dataset, batch_size):
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size=batch_size,
+        batch_size=args.batch_size,
         shuffle=False,
         num_workers=16
     )
     test_loader = DataLoader(
         test_dataset,
-        batch_size=batch_size,
+        batch_size=args.batch_size,
         shuffle=False,
         num_workers=16
     )
@@ -243,7 +343,7 @@ def get_special_token_ids(tokenizer_name):
     ]
     return special_ids, tokenizer.mask_token_id
 
-def generate_training_mask(input_ids, special_ids, mask_token_id, mask_prob=0.15):
+def generate_training_mask(input_ids, special_ids, mask_token_id, mask_prob):
     """
     Generate masked input IDs and corresponding ground-truth labels for MLM training.
 
@@ -294,14 +394,13 @@ def generate_training_mask(input_ids, special_ids, mask_token_id, mask_prob=0.15
 
     return masked_input_ids, ground_truth_labels
 
-
-
-def training_loop(run_name, model, train_loader, val_loader):
+def training_loop(args, model, train_loader, val_loader, special_ids, mask_token_id):
     """
     Training loop for fine-tuning ESM on circularly-permuted sequences
+    Now validates and saves checkpoints every 100K batches instead of every epoch
     """
     # Integrate W&B
-    run = wandb_run(run_name)
+    run = wandb_run(args)
     
     # Get hyperparameters (number of epochs, learning rate, etc)
     config = run.config
@@ -312,23 +411,62 @@ def training_loop(run_name, model, train_loader, val_loader):
 
     # Define optimizer; give the optimizer the model parameters and learning rate as inputs. 
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
+    
+    # Initialize training state
+    start_epoch = 0
+    best_val_loss = float('inf')
+    optimizer_step_count = 0
+    total_batches_processed = 0
+    
+    # Validation and checkpoint intervals
+    # getattr = get attribute from args, set default if no attribute
+    validation_interval = getattr(args, 'validation_interval', 100000)  # Default 100K batches
+    log_interval = getattr(args, 'log_interval', 1000)  # Log every 1K batches
+    
+    # Handle resuming from checkpoint
+    if args.resume_checkpoint:
+        print(f"Resuming training from: {args.resume_checkpoint}")
+        training_state = resume_training_from_checkpoint(args.resume_checkpoint, optimizer)
+        start_epoch = training_state.get('start_epoch', 0)
+        best_val_loss = training_state.get('best_val_loss', float('inf'))
+        total_batches_processed = training_state.get('total_batches_processed', 0)
+        optimizer_step_count = training_state.get('optimizer_step_count', 0)
+        print(f"Resuming from epoch {start_epoch}, batch {total_batches_processed}, best val loss: {best_val_loss:.4f}")
 
-    for epoch in range(config.epochs):
-        # Set model to train and loss to zero
+    checkpoint_dir = getattr(args, 'checkpoint_dir', '/home/ubuntu/esm/esm/checkpoints')
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    
+    # Running loss tracking for logging
+    running_loss = 0.0
+    running_loss_count = 0
+    
+    for epoch in range(start_epoch, config.epochs):
+        # Time epoch start
+        epoch_start_time = time.time()
+        
+        # Set model to train mode
         model.train()
-        total_loss = 0
-        optimizer.zero_grad()
+        epoch_loss = 0.0
+        epoch_batches = 0
+        
         # Loop through the batches in the dataloader
         for step, batch in enumerate(train_loader):
+            #batch_start_time = time.time()
+            total_batches_processed += 1
+            
+            # Log progress every N batches
+            if total_batches_processed % log_interval == 0:
+                print(f'Epoch {epoch+1}, Global Batch {total_batches_processed:,}, Epoch Batch {step+1}/{len(train_loader)}')
+                if running_loss_count > 0:
+                    avg_running_loss = running_loss / running_loss_count
+                    print(f'  Running avg loss (last {running_loss_count} batches): {avg_running_loss:.4f}')
             
             # Move the inputs from the batch to the GPU
             input_ids = batch['input_ids'].to(device)
             # Generate masked inputs and ground truth labels
-            masked_input_ids, ground_truth_labels = generate_training_mask(input_ids, config.mask_prob)
-            # Get the attention mask (masks out padding tokens during self-attention
+            masked_input_ids, ground_truth_labels = generate_training_mask(input_ids, special_ids, mask_token_id, config.mask_prob)
+            # Get the attention mask (masks out padding tokens during self-attention)
             attention_mask = batch['attention_mask'].to(device)
-            # Generate labels using mask function
-            #labels = batch['labels'].to(device) # Loader doesn't have labels in this case
 
             # Get outputs from the model
             outputs = model(
@@ -340,64 +478,197 @@ def training_loop(run_name, model, train_loader, val_loader):
             # Scale loss for gradient accumulation
             loss = outputs.loss / config.accumulation_steps
             loss.backward()
-    
-            # Gradient clipping
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            
+            # Track running loss for logging
+            true_loss_value = outputs.loss.item()
+            running_loss += true_loss_value
+            running_loss_count += 1
+            epoch_loss += true_loss_value
+            epoch_batches += 1
     
             # Step optimizer every accumulation_steps
             if (step + 1) % config.accumulation_steps == 0 or (step + 1) == len(train_loader):
+                # Gradient clipping
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 optimizer.step()
                 optimizer.zero_grad()
+                optimizer_step_count += 1
+
+                # Log training loss every 1000 optimizer steps
+                if optimizer_step_count % 1000 == 0:
+                    avg_loss_for_log = running_loss / max(running_loss_count, 1)
+                    wandb.log({
+                        "train_loss": avg_loss_for_log,
+                        "global_batch": total_batches_processed,
+                        "optimizer_step": optimizer_step_count,
+                        "epoch": epoch + 1
+                    }, step=optimizer_step_count)
+            
+            # **VALIDATION AND CHECKPOINT SAVING EVERY 100K BATCHES**
+            if total_batches_processed % validation_interval == 0:
+                print(f"\n=== VALIDATION at {total_batches_processed:,} batches ===")
+                validation_start_time = time.time()
+                
+                # Run validation
+                model.eval()
+                val_total_loss = 0
+                val_batches = 0
+
+                with torch.no_grad():
+                    for val_batch in val_loader:
+                        # Move batch to device
+                        val_input_ids = val_batch['input_ids'].to(device)
+                        val_attention_mask = val_batch['attention_mask'].to(device)
+                
+                        # Mask for MLM (same as training)
+                        val_masked_input_ids, val_ground_truth_labels = generate_training_mask(
+                            val_input_ids, special_ids, mask_token_id, config.mask_prob
+                        )
+                
+                        # Forward pass
+                        val_outputs = model(
+                            input_ids=val_masked_input_ids,
+                            attention_mask=val_attention_mask,
+                            labels=val_ground_truth_labels
+                        )
+                
+                        # Collect loss
+                        val_total_loss += val_outputs.loss.item()
+                        val_batches += 1
+                
+                # Calculate average validation loss
+                avg_val_loss = val_total_loss / max(val_batches, 1)
+                #avg_train_loss = epoch_loss / max(epoch_batches, 1)
+                avg_train_loss = running_loss / max(running_loss_count, 1)
+                validation_time = time.time() - validation_start_time
+                print(f"Validation completed in {validation_time:.2f} seconds")
+                print(f"Training Loss: {avg_train_loss:.4f}, Validation Loss: {avg_val_loss:.4f}")
+                
+                # Log to wandb
+                wandb.log({
+                    "val_loss": avg_val_loss,
+                    "train_loss_epoch_avg": avg_train_loss,
+                    "global_batch": total_batches_processed,
+                    "epoch": epoch + 1,
+                    "validation_time_seconds": validation_time
+                }, step=total_batches_processed)
+
+                # Save checkpoint if validation loss improved
+                if avg_val_loss < best_val_loss:
+                    best_val_loss = avg_val_loss
+                    
+                    checkpoint_path = os.path.join(checkpoint_dir, f"best_model_batch_{total_batches_processed}.pt")
+                    
+                    # Save comprehensive checkpoint
+                    torch.save({
+                        'epoch': epoch + 1,
+                        'total_batches_processed': total_batches_processed,
+                        'optimizer_step_count': optimizer_step_count,
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'train_loss': avg_train_loss,
+                        'val_loss': avg_val_loss,
+                        'best_val_loss': best_val_loss,
+                        'args': args,
+                        'config': dict(config) if hasattr(config, 'items') else config
+                    }, checkpoint_path)
+                    
+                    print(f"✓ NEW BEST MODEL! Checkpoint saved: {checkpoint_path}")
+                    wandb.log({"best_checkpoint_saved": total_batches_processed})
+                    
+                    # Also save a "latest_best" checkpoint for easy access
+                    latest_best_path = os.path.join(checkpoint_dir, f"latest_best_{args.run_name}.pt")
+                    torch.save({
+                        'epoch': epoch + 1,
+                        'total_batches_processed': total_batches_processed,
+                        'optimizer_step_count': optimizer_step_count,
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'train_loss': avg_train_loss,
+                        'val_loss': avg_val_loss,
+                        'best_val_loss': best_val_loss,
+                        'args': args,
+                        'config': dict(config) if hasattr(config, 'items') else config
+                    }, latest_best_path)
+                    
+                else:
+                    print(f"Validation loss did not improve (current: {avg_val_loss:.4f}, best: {best_val_loss:.4f})")
+                
+                # Always save a regular checkpoint for resuming (optional)
+                if getattr(args, 'save_regular_checkpoints', False):
+                    regular_checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_batch_{total_batches_processed}.pt")
+                    torch.save({
+                        'epoch': epoch + 1,
+                        'total_batches_processed': total_batches_processed,
+                        'optimizer_step_count': optimizer_step_count,
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'train_loss': avg_train_loss,
+                        'val_loss': avg_val_loss,
+                        'best_val_loss': best_val_loss,
+                        'args': args,
+                        'config': dict(config) if hasattr(config, 'items') else config
+                    }, regular_checkpoint_path)
+                    print(f"✓ Regular checkpoint saved: {regular_checkpoint_path}")
+                
+                # Reset running loss tracking
+                running_loss = 0.0
+                running_loss_count = 0
+                
+                # Set model back to training mode
+                model.train()
+                print("=== Resuming training ===\n")
+
+        # End of epoch summary
+        epoch_time = time.time() - epoch_start_time
+        avg_epoch_loss = epoch_loss / max(epoch_batches, 1)
+        print(f"\nEpoch {epoch+1} Summary:")
+        print(f"  Time: {epoch_time/3600:.2f} hours")
+        print(f"  Avg Loss: {avg_epoch_loss:.4f}")
+        print(f"  Batches Processed: {epoch_batches}")
+        print(f"  Total Batches So Far: {total_batches_processed:,}")
+        
+        # Log epoch summary
+        wandb.log({
+            "epoch_time_hours": epoch_time / 3600,
+            "epoch_avg_loss": avg_epoch_loss,
+            "epoch_batches": epoch_batches,
+            "epoch": epoch + 1
+        }, step=epoch + 1)
+
+    # Save final model
+    final_path = os.path.join(checkpoint_dir, f"esm_cp_finetuned_{args.run_name}_final.pt")
+    torch.save({
+        'epoch': config.epochs,
+        'total_batches_processed': total_batches_processed,
+        'optimizer_step_count': optimizer_step_count,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'best_val_loss': best_val_loss,
+        'args': args,
+        'config': dict(config) if hasattr(config, 'items') else config
+    }, final_path)
     
-            total_loss += loss.item() * config.accumulation_steps  # undo scaling for logging
+    print(f"\nTraining completed! Final model saved as: {final_path}")
+    print(f"Total batches processed: {total_batches_processed:,}")
+    print(f"Best validation loss: {best_val_loss:.4f}")
 
-        
-        avg_loss = total_loss / len(train_loader)
-        run.log({"train_loss": avg_loss, "epoch": epoch + 1})
-        #print(f"Epoch {epoch+1}/{num_epochs}, Average Loss: {avg_loss:.4f}")
-        
-        # Validation
-        model.eval()
-        
-        val_total_loss = 0
 
-        with torch.no_grad():
-            for batch in val_loader:
-                # Move batch to device
-                input_ids = batch['input_ids'].to(device)
-                attention_mask = batch['attention_mask'].to(device)
-        
-                # Mask for MLM (same as training)
-                masked_input_ids, ground_truth_labels = generate_training_mask(input_ids, mask_prob=config.mask_prob)
-        
-                # Forward pass
-                outputs = model(
-                    input_ids=masked_input_ids,
-                    attention_mask=attention_mask,
-                    labels=ground_truth_labels
-                )
-        
-                # Collect loss
-                val_total_loss += outputs.loss.item()
-        
-        # Average validation loss for the epoch
-        avg_val_loss = val_total_loss / len(val_loader)
-        run.log({"val_loss": avg_val_loss, "epoch": epoch + 1})
-        #print(f"Validation Loss: {avg_val_loss:.4f}")
 
-def wandb_run(run_name):
+def wandb_run(args):
     run = wandb.init(
         entity="aidenkzj",  # Change to your W&B entity
         project="esm-circular-permutation-finetune",  # Change to your project name
-        name=run_name,  # Set run name dynamically
+        name=args.run_name,  # Set run name dynamically
         config={
             "accumulation_steps": 8,
             "learning_rate": 1e-4,
             "architecture": "ESM-MLM",
             "dataset": "circularly-permuted-sequences",
-            "epochs": 3,
+            "epochs": 10000,
             "mask_prob": 0.15,
-            "batch_size": 64,  # adjust based on your DataLoader
+            "batch_size": args.batch_size,
+            "max_length": args.max_length,# adjust based on your DataLoader
             "optimizer": "AdamW",
             "loss_fn": "CrossEntropyLoss(ignore_index=-100)",
         },
@@ -406,7 +677,7 @@ def wandb_run(run_name):
 
 def main(args):
     print('> Loading Model, Tokenizer:')
-    model = setup_model(args.model_name)
+    model = setup_model(args.model_name, args.checkpoint_path)
     print('> Loading Dataset:')
     dataset = UniRef50Dataset(
     fasta_path=args.fasta_path,
@@ -416,20 +687,38 @@ def main(args):
     print('> Loading Dataset splits:')
     train_dataset, val_dataset, test_dataset = generate_dataset_splits(dataset, seed=args.seed)
     print('> Loading DataLoaders:')
-    train_loader, val_loader, test_loader = generate_dataloader(train_dataset, val_dataset, test_dataset, 64)
+    train_loader, val_loader, test_loader = generate_dataloader(train_dataset, val_dataset, test_dataset, args)
+    print('> Getting special tokens:')
+    special_ids, mask_token_id = get_special_token_ids(args.tokenizer_name)
+     # Convert to tensor and move to device (if using GPU)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    special_ids_tensor = torch.tensor(special_ids, device=device)
     print('> Starting Training Loop:')
-    training_loop(args.run_name, model, train_loader, val_loader) 
+    training_loop(args, model, train_loader, val_loader, special_ids_tensor, mask_token_id) 
     print('> Finetuning Workflow Complete.')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Fine-tune ESM model on circularly permuted sequences.")
     
-    parser.add_argument("--fasta_path", type=str, default = "/home/ubuntu/uniref50_subset.fasta", help="Path to UniRef50 FASTA file")
-    parser.add_argument("--tokenizer_name", type=str, default="facebook/esm2_t6_8M_UR50D", help="Hugging Face ESM tokenizer name")
-    parser.add_argument("--model_name", type=str, default="facebook/esm2_t6_8M_UR50D", help="Hugging Face ESM model name")
-    parser.add_argument("--max_length", type=int, default=512, help="Maximum sequence length")
+    parser.add_argument("--fasta_path", type=str, default = "/home/ubuntu/uniref50.fasta", help="Path to UniRef50 FASTA file")
+    parser.add_argument("--tokenizer_name", type=str, default="facebook/esm2_t30_150M_UR50D", help="Hugging Face ESM tokenizer name")
+    parser.add_argument("--model_name", type=str, default="facebook/esm2_t30_150M_UR50D", help="Hugging Face ESM model name")
+    parser.add_argument("--max_length", type=int, default=128, help="Maximum sequence length")
+    parser.add_argument("--batch_size", type=int, default=128, help="batch size")
     parser.add_argument("--run_name", type=str, default="esm_cp_ft_test_run", help="Name for W&B run")
     parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
+    
+    # Checkpoint loading arguments
+    parser.add_argument("--checkpoint_path", type=str, default=None, help="Path to checkpoint to load model weights from")
+    parser.add_argument("--resume_checkpoint", type=str, default=None, help="Path to checkpoint to resume training from (loads optimizer state too)")
+    parser.add_argument("--checkpoint_dir", type=str, default="/home/ubuntu/esm/esm/checkpoints", help="Directory to save checkpoints")
+    
+    # Validation and logging intervals
+    parser.add_argument("--validation_interval", type=int, default=100000, help="Run validation every N batches (default: 100,000)")
+    parser.add_argument("--log_interval", type=int, default=1000, help="Print progress every N batches (default: 1,000)")
+    
+    # Checkpoint saving strategy - FIXED
+    parser.add_argument("--save_regular_checkpoints", action="store_true", help="Save checkpoints every validation interval regardless of loss improvement")
     
     args = parser.parse_args()
     main(args)
