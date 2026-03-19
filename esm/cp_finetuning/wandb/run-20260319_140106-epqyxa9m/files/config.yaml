@@ -1,0 +1,143 @@
+_wandb:
+    value:
+        cli_version: 0.22.1
+        e:
+            3hlnut6arrza4g0zoi956yj0gvlrl40w:
+                args:
+                    - --batch_size
+                    - "32"
+                    - --fasta_path
+                    - /orcd/home/002/aidenkzj/uniref50_filtered512.fasta
+                    - --run_name
+                    - esm_cp_4gpu
+                codePath: esm/cp_finetuning/finetune_esm_distributed.py
+                codePathLocal: finetune_esm_distributed.py
+                cpu_count: 120
+                cpu_count_logical: 240
+                cudaVersion: "13.1"
+                disk:
+                    /:
+                        total: "944364355584"
+                        used: "18607689728"
+                email: aidenkoloj@gmail.com
+                executable: /orcd/software/core/001/pkg/miniforge/24.3.0-0/bin/python
+                git:
+                    commit: 5ead25c10c9a41e4bfb836eca8afa91d9c4d4537
+                    remote: https://github.com/aidenkoloj/esm.git
+                gpu: NVIDIA H200
+                gpu_count: 4
+                gpu_nvidia:
+                    - architecture: Hopper
+                      cudaCores: 16896
+                      memoryTotal: "150754820096"
+                      name: NVIDIA H200
+                      uuid: GPU-839c4c72-be04-d993-b6d3-e7395907a74d
+                    - architecture: Hopper
+                      cudaCores: 16896
+                      memoryTotal: "150754820096"
+                      name: NVIDIA H200
+                      uuid: GPU-6254dd3c-b2f8-0098-ff53-e8b014c215b5
+                    - architecture: Hopper
+                      cudaCores: 16896
+                      memoryTotal: "150754820096"
+                      name: NVIDIA H200
+                      uuid: GPU-16491122-7ce3-93a6-63a2-05f083526a45
+                    - architecture: Hopper
+                      cudaCores: 16896
+                      memoryTotal: "150754820096"
+                      name: NVIDIA H200
+                      uuid: GPU-1b96b0d4-e448-fcbe-81a3-a50ed84c98d5
+                host: node4400
+                memory:
+                    total: "2163435835392"
+                os: Linux-4.18.0-372.9.1.el8.x86_64-x86_64-with-glibc2.28
+                program: /orcd/home/002/aidenkzj/esm/esm/cp_finetuning/finetune_esm_distributed.py
+                python: CPython 3.10.14
+                root: /orcd/home/002/aidenkzj/esm/esm/cp_finetuning
+                slurm:
+                    cluster_name: eofe7
+                    conf: /etc/slurm/slurm.conf
+                    cpus_on_node: "16"
+                    cpus_per_task: "16"
+                    gpus_on_node: "4"
+                    gtids: "0"
+                    job_account: mit_general
+                    job_cpus_per_node: "16"
+                    job_end_time: "1774115963"
+                    job_gid: "242824"
+                    job_gpus: 4,5,6,7
+                    job_id: "10693949"
+                    job_name: run_finetune_training.sh
+                    job_nodelist: node4400
+                    job_num_nodes: "1"
+                    job_partition: mit_preemptable
+                    job_qos: normal
+                    job_start_time: "1773943163"
+                    job_uid: "242824"
+                    job_user: aidenkzj
+                    jobid: "10693949"
+                    localid: "0"
+                    mem_per_node: "81920"
+                    nnodes: "1"
+                    nodeid: "0"
+                    nodelist: node4400
+                    oom_kill_step: "0"
+                    prio_process: "0"
+                    procid: "0"
+                    script_context: prolog_task
+                    submit_dir: /orcd/home/002/aidenkzj/esm/esm/cp_finetuning
+                    submit_host: orcd-login001.mit.edu
+                    task_pid: "1395487"
+                    tasks_per_node: "1"
+                    topology_addr: node4400
+                    topology_addr_pattern: node
+                    tres_per_task: cpu=16
+                startedAt: "2026-03-19T18:01:06.336387Z"
+                writerId: 3hlnut6arrza4g0zoi956yj0gvlrl40w
+        m: []
+        python_version: 3.10.14
+        t:
+            "1":
+                - 1
+                - 5
+                - 11
+                - 41
+                - 49
+                - 53
+                - 105
+            "2":
+                - 1
+                - 5
+                - 11
+                - 41
+                - 49
+                - 53
+                - 105
+            "3":
+                - 13
+                - 16
+            "4": 3.10.14
+            "5": 0.22.1
+            "6": 4.56.2
+            "12": 0.22.1
+            "13": linux-x86_64
+accumulation_steps:
+    value: 8
+architecture:
+    value: ESM-MLM
+batch_size:
+    value: 32
+dataset:
+    value: circularly-permuted-sequences
+epochs:
+    value: 10000
+learning_rate:
+    value: 0.0001
+loss_fn:
+    value: CrossEntropyLoss(ignore_index=-100)
+mask_prob:
+    value: 0.15
+max_length:
+    value: 256
+optimizer:
+    value: AdamW

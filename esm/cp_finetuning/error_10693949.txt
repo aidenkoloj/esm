@@ -1,0 +1,145 @@
+W0319 13:59:26.066000 1395532 site-packages/torch/distributed/run.py:793] 
+W0319 13:59:26.066000 1395532 site-packages/torch/distributed/run.py:793] *****************************************
+W0319 13:59:26.066000 1395532 site-packages/torch/distributed/run.py:793] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0319 13:59:26.066000 1395532 site-packages/torch/distributed/run.py:793] *****************************************
+wandb: Currently logged in as: aidenkoloj (aidenkzj) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run epqyxa9m
+wandb: Tracking run with wandb version 0.22.1
+wandb: Run data is saved locally in /orcd/home/002/aidenkzj/esm/esm/cp_finetuning/wandb/run-20260319_140106-epqyxa9m
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run esm_cp_4gpu
+wandb: ⭐️ View project at https://wandb.ai/aidenkzj/esm_cp_finetune_2
+wandb: 🚀 View run at https://wandb.ai/aidenkzj/esm_cp_finetune_2/runs/epqyxa9m
+Traceback (most recent call last):
+  File "/orcd/home/002/aidenkzj/esm/esm/cp_finetuning/finetune_esm_distributed.py", line 763, in <module>
+    main(args)
+  File "/orcd/home/002/aidenkzj/esm/esm/cp_finetuning/finetune_esm_distributed.py", line 735, in main
+    training_loop(args, model, train_loader, val_loader, special_ids_tensor, mask_token_id)
+  File "/orcd/home/002/aidenkzj/esm/esm/cp_finetuning/finetune_esm_distributed.py", line 500, in training_loop
+    outputs = model(
+  File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/parallel/distributed.py", line 1639, in forward
+    inputs, kwargs = self._pre_forward(*inputs, **kwargs)
+  File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/parallel/distributed.py", line 1528, in _pre_forward
+    if torch.is_grad_enabled() and self.reducer._rebuild_buckets():
+RuntimeError: Expected to have finished reduction in the prior iteration before starting a new one. This error indicates that your module has parameters that were not used in producing loss. You can enable unused parameter detection by passing the keyword argument `find_unused_parameters=True` to `torch.nn.parallel.DistributedDataParallel`, and by 
+making sure all `forward` function outputs participate in calculating loss. 
+If you already have done the above, then the distributed data parallel module wasn't able to locate the output tensors in the return value of your module's `forward` function. Please include the loss function and the structure of the return value of `forward` of your module when reporting this issue (e.g. list, dict, iterable).
+Parameter indices which did not receive grad for rank 0: 483 484
+ In addition, you can set the environment variable TORCH_DISTRIBUTED_DEBUG to either INFO or DETAIL to print out information about which particular parameters did not receive gradient on this rank as part of this error
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/orcd/home/002/aidenkzj/esm/esm/cp_finetuning/finetune_esm_distributed.py", line 763, in <module>
+[rank0]:     main(args)
+[rank0]:   File "/orcd/home/002/aidenkzj/esm/esm/cp_finetuning/finetune_esm_distributed.py", line 735, in main
+[rank0]:     training_loop(args, model, train_loader, val_loader, special_ids_tensor, mask_token_id)
+[rank0]:   File "/orcd/home/002/aidenkzj/esm/esm/cp_finetuning/finetune_esm_distributed.py", line 500, in training_loop
+[rank0]:     outputs = model(
+[rank0]:   File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:   File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:   File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/parallel/distributed.py", line 1639, in forward
+[rank0]:     inputs, kwargs = self._pre_forward(*inputs, **kwargs)
+[rank0]:   File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/parallel/distributed.py", line 1528, in _pre_forward
+[rank0]:     if torch.is_grad_enabled() and self.reducer._rebuild_buckets():
+[rank0]: RuntimeError: Expected to have finished reduction in the prior iteration before starting a new one. This error indicates that your module has parameters that were not used in producing loss. You can enable unused parameter detection by passing the keyword argument `find_unused_parameters=True` to `torch.nn.parallel.DistributedDataParallel`, and by 
+[rank0]: making sure all `forward` function outputs participate in calculating loss. 
+[rank0]: If you already have done the above, then the distributed data parallel module wasn't able to locate the output tensors in the return value of your module's `forward` function. Please include the loss function and the structure of the return value of `forward` of your module when reporting this issue (e.g. list, dict, iterable).
+[rank0]: Parameter indices which did not receive grad for rank 0: 483 484
+[rank0]:  In addition, you can set the environment variable TORCH_DISTRIBUTED_DEBUG to either INFO or DETAIL to print out information about which particular parameters did not receive gradient on this rank as part of this error
+[rank2]: Traceback (most recent call last):
+[rank2]:   File "/orcd/home/002/aidenkzj/esm/esm/cp_finetuning/finetune_esm_distributed.py", line 763, in <module>
+[rank2]:     main(args)
+[rank2]:   File "/orcd/home/002/aidenkzj/esm/esm/cp_finetuning/finetune_esm_distributed.py", line 735, in main
+[rank2]:     training_loop(args, model, train_loader, val_loader, special_ids_tensor, mask_token_id)
+[rank2]:   File "/orcd/home/002/aidenkzj/esm/esm/cp_finetuning/finetune_esm_distributed.py", line 500, in training_loop
+[rank2]:     outputs = model(
+[rank2]:   File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+[rank2]:     return self._call_impl(*args, **kwargs)
+[rank2]:   File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+[rank2]:     return forward_call(*args, **kwargs)
+[rank2]:   File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/parallel/distributed.py", line 1639, in forward
+[rank2]:     inputs, kwargs = self._pre_forward(*inputs, **kwargs)
+[rank2]:   File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/parallel/distributed.py", line 1528, in _pre_forward
+[rank2]:     if torch.is_grad_enabled() and self.reducer._rebuild_buckets():
+[rank2]: RuntimeError: Expected to have finished reduction in the prior iteration before starting a new one. This error indicates that your module has parameters that were not used in producing loss. You can enable unused parameter detection by passing the keyword argument `find_unused_parameters=True` to `torch.nn.parallel.DistributedDataParallel`, and by 
+[rank2]: making sure all `forward` function outputs participate in calculating loss. 
+[rank2]: If you already have done the above, then the distributed data parallel module wasn't able to locate the output tensors in the return value of your module's `forward` function. Please include the loss function and the structure of the return value of `forward` of your module when reporting this issue (e.g. list, dict, iterable).
+[rank2]: Parameter indices which did not receive grad for rank 2: 483 484
+[rank2]:  In addition, you can set the environment variable TORCH_DISTRIBUTED_DEBUG to either INFO or DETAIL to print out information about which particular parameters did not receive gradient on this rank as part of this error
+[rank3]: Traceback (most recent call last):
+[rank3]:   File "/orcd/home/002/aidenkzj/esm/esm/cp_finetuning/finetune_esm_distributed.py", line 763, in <module>
+[rank3]:     main(args)
+[rank3]:   File "/orcd/home/002/aidenkzj/esm/esm/cp_finetuning/finetune_esm_distributed.py", line 735, in main
+[rank3]:     training_loop(args, model, train_loader, val_loader, special_ids_tensor, mask_token_id)
+[rank3]:   File "/orcd/home/002/aidenkzj/esm/esm/cp_finetuning/finetune_esm_distributed.py", line 500, in training_loop
+[rank3]:     outputs = model(
+[rank3]:   File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+[rank3]:     return self._call_impl(*args, **kwargs)
+[rank3]:   File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+[rank3]:     return forward_call(*args, **kwargs)
+[rank3]:   File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/parallel/distributed.py", line 1639, in forward
+[rank3]:     inputs, kwargs = self._pre_forward(*inputs, **kwargs)
+[rank3]:   File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/parallel/distributed.py", line 1528, in _pre_forward
+[rank3]:     if torch.is_grad_enabled() and self.reducer._rebuild_buckets():
+[rank3]: RuntimeError: Expected to have finished reduction in the prior iteration before starting a new one. This error indicates that your module has parameters that were not used in producing loss. You can enable unused parameter detection by passing the keyword argument `find_unused_parameters=True` to `torch.nn.parallel.DistributedDataParallel`, and by 
+[rank3]: making sure all `forward` function outputs participate in calculating loss. 
+[rank3]: If you already have done the above, then the distributed data parallel module wasn't able to locate the output tensors in the return value of your module's `forward` function. Please include the loss function and the structure of the return value of `forward` of your module when reporting this issue (e.g. list, dict, iterable).
+[rank3]: Parameter indices which did not receive grad for rank 3: 483 484
+[rank3]:  In addition, you can set the environment variable TORCH_DISTRIBUTED_DEBUG to either INFO or DETAIL to print out information about which particular parameters did not receive gradient on this rank as part of this error
+[rank1]: Traceback (most recent call last):
+[rank1]:   File "/orcd/home/002/aidenkzj/esm/esm/cp_finetuning/finetune_esm_distributed.py", line 763, in <module>
+[rank1]:     main(args)
+[rank1]:   File "/orcd/home/002/aidenkzj/esm/esm/cp_finetuning/finetune_esm_distributed.py", line 735, in main
+[rank1]:     training_loop(args, model, train_loader, val_loader, special_ids_tensor, mask_token_id)
+[rank1]:   File "/orcd/home/002/aidenkzj/esm/esm/cp_finetuning/finetune_esm_distributed.py", line 500, in training_loop
+[rank1]:     outputs = model(
+[rank1]:   File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+[rank1]:     return self._call_impl(*args, **kwargs)
+[rank1]:   File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+[rank1]:     return forward_call(*args, **kwargs)
+[rank1]:   File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/parallel/distributed.py", line 1639, in forward
+[rank1]:     inputs, kwargs = self._pre_forward(*inputs, **kwargs)
+[rank1]:   File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/nn/parallel/distributed.py", line 1528, in _pre_forward
+[rank1]:     if torch.is_grad_enabled() and self.reducer._rebuild_buckets():
+[rank1]: RuntimeError: Expected to have finished reduction in the prior iteration before starting a new one. This error indicates that your module has parameters that were not used in producing loss. You can enable unused parameter detection by passing the keyword argument `find_unused_parameters=True` to `torch.nn.parallel.DistributedDataParallel`, and by 
+[rank1]: making sure all `forward` function outputs participate in calculating loss. 
+[rank1]: If you already have done the above, then the distributed data parallel module wasn't able to locate the output tensors in the return value of your module's `forward` function. Please include the loss function and the structure of the return value of `forward` of your module when reporting this issue (e.g. list, dict, iterable).
+[rank1]: Parameter indices which did not receive grad for rank 1: 483 484
+[rank1]:  In addition, you can set the environment variable TORCH_DISTRIBUTED_DEBUG to either INFO or DETAIL to print out information about which particular parameters did not receive gradient on this rank as part of this error
+W0319 14:01:18.840000 1395532 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1395583 closing signal SIGTERM
+W0319 14:01:18.841000 1395532 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1395584 closing signal SIGTERM
+W0319 14:01:18.841000 1395532 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 1395585 closing signal SIGTERM
+E0319 14:01:20.056000 1395532 site-packages/torch/distributed/elastic/multiprocessing/api.py:869] failed (exitcode: 1) local_rank: 3 (pid: 1395586) of binary: /orcd/software/core/001/pkg/miniforge/24.3.0-0/bin/python
+Traceback (most recent call last):
+  File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/bin/torchrun", line 33, in <module>
+    sys.exit(load_entry_point('torch==2.5.1', 'console_scripts', 'torchrun')())
+  File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 355, in wrapper
+    return f(*args, **kwargs)
+  File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/distributed/run.py", line 919, in main
+    run(args)
+  File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/distributed/run.py", line 910, in run
+    elastic_launch(
+  File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 138, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/orcd/software/core/001/pkg/miniforge/24.3.0-0/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 269, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+finetune_esm_distributed.py FAILED
+------------------------------------------------------------
+Failures:
+  <NO_OTHER_FAILURES>
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2026-03-19_14:01:18
+  host      : node4400.inband
+  rank      : 3 (local_rank: 3)
+  exitcode  : 1 (pid: 1395586)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================

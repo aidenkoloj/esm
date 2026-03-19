@@ -1,0 +1,13 @@
+> Loading Model, Tokenizer:
+> Loading Dataset:
+> Loading Dataset splits:
+Number of sequences in dataset: 52,608,493
+Number of sequences in dataset: 52,608,493
+Number of sequences in dataset: 52,608,493
+Number of sequences in dataset: 52,608,493
+> Loading DataLoaders:
+> Getting special tokens:
+> Starting Training Loop:
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mesm_cp_4gpu[0m at: [34mhttps://wandb.ai/aidenkzj/esm_cp_finetune_2/runs/epqyxa9m[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20260319_140106-epqyxa9m/logs[0m
